@@ -63,7 +63,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     for (int i = 0; i < ic->nb_streams; i++) {
         AVStream *as = ic->streams[i];
         if (as->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            LOGW("視頻數據");
+            LOGW("视频数据");
             videoStream = i;
             //将帧率转换为浮点数
             fps = r2d(as->avg_frame_rate);
@@ -79,7 +79,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
 
 
         } else if (as->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            LOGW("音頻數據");
+            LOGW("音频数据");
             audioStream = i;
             LOGW("sample_rate=%d channels=%d sample_format=%d",
                  as->codecpar->sample_rate,
@@ -95,8 +95,30 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     audioStream = av_find_best_stream(ic, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
     LOGW("av_find_best_stream audioStream = %d", audioStream);
 
+    //读取帧数据
+    AVPacket *pkt = av_packet_alloc();
+    for (;;) {
+        int re = av_read_frame(ic, pkt);
+        if (re != 0) {
+            LOGW("读取到结尾处！");
+            int pos = 3 * r2d(ic->streams[videoStream]->time_base);
+            //AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_FRAME 时间往后找，同时要是关键帧
+            av_seek_frame(ic, videoStream, pos, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_FRAME);
+            continue;
+        }
+        LOGW("stream =%d size = %d pts = %lld flag = %d",
+             pkt->stream_index, pkt->size, pkt->pts, pkt->flags);
+        //////////////////////////////////////
 
-    //關閉上下文
+
+
+
+        //关闭packet引用
+        av_packet_unref(pkt);
+    }
+
+
+    //关闭上下文
     avformat_close_input(&ic);
     return env->NewStringUTF(hello.c_str());
 }
