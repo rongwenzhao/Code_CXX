@@ -91,6 +91,10 @@ Java_com_nick_play_MainActivity_stringFromJNI(
         }
     }
 
+    //通过使用av_find_best_stream()的方式获取音视频流
+    audioStream = av_find_best_stream(ic, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+    LOGW("av_find_best_stream audioStream = %d", audioStream);
+
 
     //關閉上下文
     avformat_close_input(&ic);
