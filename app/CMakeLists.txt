@@ -26,6 +26,9 @@ set_target_properties(avformat PROPERTIES IMPORTED_LOCATION ${FFPATH}/libavforma
 add_library(avutil SHARED IMPORTED)
 set_target_properties(avutil PROPERTIES IMPORTED_LOCATION ${FFPATH}/libavutil.so)
 
+add_library(swscale SHARED IMPORTED)
+set_target_properties(swscale PROPERTIES IMPORTED_LOCATION ${FFPATH}/libswscale.so)
+
 add_library( # Sets the name of the library.
              native-lib
 
@@ -57,6 +60,7 @@ target_link_libraries( # Specifies the target library.
                        avcodec
                        avformat
                        avutil
+                       swscale
 
                        # Links the target library to the log library
                        # included in the NDK.

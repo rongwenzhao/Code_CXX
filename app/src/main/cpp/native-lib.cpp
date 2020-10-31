@@ -13,6 +13,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/jni.h>
+#include <libswscale/swscale.h>//图像像素格式转换的头文件
 
 }
 
@@ -34,12 +35,12 @@ long long GetNowMs() {
     return t;
 }
 
-extern "C"
+/*extern "C"
 JNIEXPORT
 jint JNI_OnLoad(JavaVM *vm, void *res) {
     av_jni_set_java_vm(vm, 0);
     return JNI_VERSION_1_4;
-}
+}*/
 
 extern "C"
 JNIEXPORT jstring JNICALL
@@ -121,7 +122,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     AVCodec *vcodec = avcodec_find_decoder(ic->streams[videoStream]->codecpar->codec_id);
 
     //硬解码器
-    vcodec = avcodec_find_decoder_by_name("h264_mediacodec");
+    //vcodec = avcodec_find_decoder_by_name("h264_mediacodec");
 
     if (!vcodec) {
         LOGW("avcodec_find video failed!");
@@ -174,6 +175,13 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     AVFrame *frame = av_frame_alloc();
     long long start = GetNowMs();
     int frameCount = 0;
+
+    //初始化像素格式转换的上下文
+    SwsContext *vctx = NULL;
+    int outWidth = 1920;
+    int outHeight = 1080;
+    char *rgb = new char[1920 * 1080 * 4];
+
     for (;;) {
 
         //超过三秒
@@ -212,6 +220,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
             continue;
         }
 
+
         //接收解码后的数据帧
         for (;;) {//一直读取解码后的缓冲中的数据，直到读取失败。因为，可能缓冲中是之前的数据，所以要一直读到最后。
             re = avcodec_receive_frame(cc, frame);
@@ -224,12 +233,41 @@ Java_com_nick_play_MainActivity_stringFromJNI(
             //视频帧
             if (cc == vc) {
                 frameCount++;
+                //初始化像素转换上下文
+                vctx = sws_getCachedContext(vctx,
+                                            frame->width,
+                                            frame->height,
+                                            (AVPixelFormat) frame->format,
+                                            outWidth,
+                                            outHeight,
+                                            AV_PIX_FMT_RGBA,
+                                            SWS_FAST_BILINEAR,//线性插值的算法
+                                            0, 0, 0
+                );
+                if (!vctx) {
+                    LOGW("sws_getCachedContext failed!");
+                } else {
+                    //转换
+                    uint8_t *data[AV_NUM_DATA_POINTERS] = {0};
+                    data[0] = (uint8_t *) rgb;
+                    int lines[AV_NUM_DATA_POINTERS] = {0};
+                    lines[0] = outWidth * 4;//输出 AV_PIX_FMT_RGBA格式，乘以4
+
+                    int h = sws_scale(vctx,
+                                      frame->data,
+                                      frame->linesize, 0,
+                                      frame->height,
+                                      data, lines);
+                    LOGW("sws_scale = %d!", h);
+
+                }
+
             }
         }
 
 
     }
-
+    delete rgb;
     //关闭上下文
     avformat_close_input(&ic);
     return env->NewStringUTF(hello.c_str());
