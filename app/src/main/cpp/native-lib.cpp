@@ -24,6 +24,16 @@ static double r2d(AVRational r) {
     return r.num == 0 || r.den == 0 ? 0 : (double) r.num / (double) r.den;
 }
 
+//当前时间戳 clock
+long long GetNowMs() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    int sec = tv.tv_sec % 360000;//只计算100个小时内的时间计算
+    long long t = sec * 1000 + tv.tv_usec / 1000;
+    return t;
+}
+
+
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_nick_play_MainActivity_stringFromJNI(
@@ -114,7 +124,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     //视频 解码器初始化
     AVCodecContext *vc = avcodec_alloc_context3(vcodec);//解码上下文
     avcodec_parameters_to_context(vc, ic->streams[videoStream]->codecpar);//将视频参数赋值到解码器context当中。
-    vc->thread_count = 1;//线程数
+    vc->thread_count = 4;//线程数
 
     //打开视频解码器
     re = avcodec_open2(vc, 0, 0);
@@ -135,7 +145,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     //音频 解码器初始化
     AVCodecContext *ac = avcodec_alloc_context3(acodec);//解码上下文
     avcodec_parameters_to_context(ac, ic->streams[audioStream]->codecpar);//将视频参数赋值到解码器context当中。
-    ac->thread_count = 1;//线程数
+    ac->thread_count = 4;//线程数
 
     //打开音频解码器
     re = avcodec_open2(ac, 0, 0);
@@ -155,7 +165,17 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     //读取帧数据
     AVPacket *pkt = av_packet_alloc();
     AVFrame *frame = av_frame_alloc();
+    long long start = GetNowMs();
+    int frameCount = 0;
     for (;;) {
+
+        //超过三秒
+        if (GetNowMs() - start >= 3000) {
+            LOGW("now decode fps = %d", frameCount / 3);
+            start = GetNowMs();
+            frameCount = 0;
+        }
+
         int re = av_read_frame(ic, pkt);
         if (re != 0) {
             LOGW("读取到结尾处！");
@@ -194,6 +214,10 @@ Java_com_nick_play_MainActivity_stringFromJNI(
             }
             //接收成功
             LOGW("avcodec_receive_frame %lld", frame->pts);
+            //视频帧
+            if (cc == vc) {
+                frameCount++;
+            }
         }
 
 
