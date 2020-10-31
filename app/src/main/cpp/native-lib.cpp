@@ -144,13 +144,18 @@ Java_com_nick_play_MainActivity_stringFromJNI(
         return env->NewStringUTF("");
     }
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //通过 avcodec_send_packet 发送 AVPacket到线程中去解码
+    //通过read Frame 读取解码后的数据的过程。
 
 
 
     //读取帧数据
     AVPacket *pkt = av_packet_alloc();
-    /*for (;;) {
+    AVFrame *frame = av_frame_alloc();
+    for (;;) {
         int re = av_read_frame(ic, pkt);
         if (re != 0) {
             LOGW("读取到结尾处！");
@@ -161,19 +166,48 @@ Java_com_nick_play_MainActivity_stringFromJNI(
         }
         LOGW("stream =%d size = %d pts = %lld flag = %d",
              pkt->stream_index, pkt->size, pkt->pts, pkt->flags);
-        //////////////////////////////////////
+        ////////////////////////////////////// 音，视频帧的发送与解码后帧的读取
 
+        AVCodecContext *cc = vc;
+        if (pkt->stream_index == audioStream) {
+            cc = ac;
+        }
 
+        //发送到线程中解码
+        re = avcodec_send_packet(cc, pkt);
 
-
-        //关闭packet引用
+        //上面avcodec_send_packet中pkt会被复制一份，所以此处可以直接清理
         av_packet_unref(pkt);
-    }*/
+
+        if (re != 0) {
+            LOGW("avcodec_send_packet failed");
+            continue;
+        }
+
+        //接收解码后的数据帧
+        for (;;) {//一直读取解码后的缓冲中的数据，直到读取失败。因为，可能缓冲中是之前的数据，所以要一直读到最后。
+            re = avcodec_receive_frame(cc, frame);
+            if (re != 0) {
+                //LOGW("avcodec_receive_frame failed");
+                break;
+            }
+            //接收成功
+            LOGW("avcodec_receive_frame %lld", frame->pts);
+        }
 
 
-    //关闭上下文
+    }
+
+
+//关闭上下文
     avformat_close_input(&ic);
-    return env->NewStringUTF(hello.c_str());
+    return env->
+            NewStringUTF(hello
+                                 .
+
+                                         c_str()
+
+    );
 }
 
 extern "C"
