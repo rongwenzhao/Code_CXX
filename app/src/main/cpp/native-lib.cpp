@@ -12,6 +12,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavcodec/jni.h>
 
 }
 
@@ -33,6 +34,12 @@ long long GetNowMs() {
     return t;
 }
 
+extern "C"
+JNIEXPORT
+jint JNI_OnLoad(JavaVM *vm, void *res) {
+    av_jni_set_java_vm(vm, 0);
+    return JNI_VERSION_1_4;
+}
 
 extern "C"
 JNIEXPORT jstring JNICALL
@@ -114,7 +121,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     AVCodec *vcodec = avcodec_find_decoder(ic->streams[videoStream]->codecpar->codec_id);
 
     //硬解码器
-//    codec = avcodec_find_decoder_by_name("h264_mediacodec");
+    vcodec = avcodec_find_decoder_by_name("h264_mediacodec");
 
     if (!vcodec) {
         LOGW("avcodec_find video failed!");
@@ -223,16 +230,9 @@ Java_com_nick_play_MainActivity_stringFromJNI(
 
     }
 
-
-//关闭上下文
+    //关闭上下文
     avformat_close_input(&ic);
-    return env->
-            NewStringUTF(hello
-                                 .
-
-                                         c_str()
-
-    );
+    return env->NewStringUTF(hello.c_str());
 }
 
 extern "C"
