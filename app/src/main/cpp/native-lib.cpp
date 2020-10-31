@@ -35,8 +35,11 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     av_register_all();
     //初始化網絡
     avformat_network_init();
-    //打开文件
 
+    //注册解码器
+    avcodec_register_all();
+
+    //打开文件
     AVFormatContext *ic = NULL;
     char path[] = "/sdcard/1280x720_1.mp4";
 //    char path[] = "/sdcard/1280x720_1.flv";
@@ -95,9 +98,62 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     audioStream = av_find_best_stream(ic, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
     LOGW("av_find_best_stream audioStream = %d", audioStream);
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    //打开视频解码器
+    //视频 软解码器
+    AVCodec *vcodec = avcodec_find_decoder(ic->streams[videoStream]->codecpar->codec_id);
+
+    //硬解码器
+//    codec = avcodec_find_decoder_by_name("h264_mediacodec");
+
+    if (!vcodec) {
+        LOGW("avcodec_find video failed!");
+        return env->NewStringUTF("");
+    }
+
+    //视频 解码器初始化
+    AVCodecContext *vc = avcodec_alloc_context3(vcodec);//解码上下文
+    avcodec_parameters_to_context(vc, ic->streams[videoStream]->codecpar);//将视频参数赋值到解码器context当中。
+    vc->thread_count = 1;//线程数
+
+    //打开视频解码器
+    re = avcodec_open2(vc, 0, 0);
+    if (re != 0) {
+        LOGW("avcodec_open2 video failed!");
+        return env->NewStringUTF("");
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////
+    //打开音频解码器
+    //音频 软解码器
+    AVCodec *acodec = avcodec_find_decoder(ic->streams[audioStream]->codecpar->codec_id);
+
+    //硬解码器
+//    codec = avcodec_find_decoder_by_name("h264_mediacodec");
+
+    if (!acodec) {
+        LOGW("avcodec_find audio failed!");
+        return env->NewStringUTF("");
+    }
+
+    //音频 解码器初始化
+    AVCodecContext *ac = avcodec_alloc_context3(acodec);//解码上下文
+    avcodec_parameters_to_context(ac, ic->streams[audioStream]->codecpar);//将视频参数赋值到解码器context当中。
+    ac->thread_count = 1;//线程数
+
+    //打开音频解码器
+    re = avcodec_open2(ac, 0, 0);
+    if (re != 0) {
+        LOGW("avcodec_open2 audio failed!");
+        return env->NewStringUTF("");
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
     //读取帧数据
     AVPacket *pkt = av_packet_alloc();
-    for (;;) {
+    /*for (;;) {
         int re = av_read_frame(ic, pkt);
         if (re != 0) {
             LOGW("读取到结尾处！");
@@ -115,7 +171,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
 
         //关闭packet引用
         av_packet_unref(pkt);
-    }
+    }*/
 
 
     //关闭上下文
