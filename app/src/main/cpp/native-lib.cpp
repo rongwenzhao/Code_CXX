@@ -127,9 +127,6 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     //音频 软解码器
     AVCodec *acodec = avcodec_find_decoder(ic->streams[audioStream]->codecpar->codec_id);
 
-    //硬解码器
-//    codec = avcodec_find_decoder_by_name("h264_mediacodec");
-
     if (!acodec) {
         LOGW("avcodec_find audio failed!");
         return env->NewStringUTF("");
