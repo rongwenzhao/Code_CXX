@@ -173,6 +173,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
             cc = ac;
         }
 
+
         //发送到线程中解码
         re = avcodec_send_packet(cc, pkt);
 
