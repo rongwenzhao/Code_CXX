@@ -14,6 +14,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/jni.h>
 #include <libswscale/swscale.h>//图像像素格式转换的头文件
+#include <libswresample/swresample.h>//音频重采样
 
 }
 
@@ -181,6 +182,27 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     int outWidth = 1920;
     int outHeight = 1080;
     char *rgb = new char[1920 * 1080 * 4];
+    char *pcm = new char[48000 * 4 * 2];//1秒种的音频数据存储
+
+    //音频重采样上下文初始化
+    //重采样上下文初始化
+    SwrContext *actx = swr_alloc();
+    //设置参数
+    actx = swr_alloc_set_opts(actx,
+                              av_get_default_channel_layout(2),//输出两声道的channel_layout
+                              AV_SAMPLE_FMT_S16,
+                              ac->sample_rate,//样本率假定不变
+                              av_get_default_channel_layout(ac->channels),
+                              ac->sample_fmt,
+                              ac->sample_rate,
+                              0, 0);
+    re = swr_init(actx);
+    if (re != 0) {
+        LOGW("swr_init failed!");
+    } else {
+        LOGW("swr_init success!");
+    }
+
 
     for (;;) {
 
@@ -231,7 +253,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
             //接收成功
             LOGW("avcodec_receive_frame %lld", frame->pts);
             //视频帧
-            if (cc == vc) {
+            if (cc == vc) {//视频帧的处理
                 frameCount++;
                 //初始化像素转换上下文
                 vctx = sws_getCachedContext(vctx,
@@ -248,9 +270,9 @@ Java_com_nick_play_MainActivity_stringFromJNI(
                     LOGW("sws_getCachedContext failed!");
                 } else {
                     //转换
-                    uint8_t *data[AV_NUM_DATA_POINTERS] = {0};
+                    uint8_t *data[AV_NUM_DATA_POINTERS] = {0};//uint8_t 即 unsigned char
                     data[0] = (uint8_t *) rgb;
-                    int lines[AV_NUM_DATA_POINTERS] = {0};
+                    int lines[AV_NUM_DATA_POINTERS] = {0};//一行宽度的大小
                     lines[0] = outWidth * 4;//输出 AV_PIX_FMT_RGBA格式，乘以4
 
                     int h = sws_scale(vctx,
@@ -262,12 +284,23 @@ Java_com_nick_play_MainActivity_stringFromJNI(
 
                 }
 
+            } else {//音频的处理
+                uint8_t *out[2] = {0};
+                out[0] = (uint8_t *) pcm;
+                //音频重采样
+                int len = swr_convert(actx, out,
+                                      frame->nb_samples,
+                                      (const uint8_t **) frame->data,
+                                      frame->nb_samples);
+
+                LOGW("swr_convert = %d! nb_samples = %d", len, frame->nb_samples);//1024
             }
         }
 
 
     }
     delete rgb;
+    delete pcm;
     //关闭上下文
     avformat_close_input(&ic);
     return env->NewStringUTF(hello.c_str());
