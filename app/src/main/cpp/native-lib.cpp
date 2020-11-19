@@ -1,6 +1,8 @@
 #include <jni.h>
 #include <string>
 #include <android/log.h>
+#include <android/native_window.h>
+#include <android/native_window_jni.h>
 
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,"CODE_CXX",__VA_ARGS__)
 
@@ -50,6 +52,34 @@ Java_com_nick_play_MainActivity_stringFromJNI(
         jobject /* this */) {
     std::string hello = "Hello from C++";
     hello += avcodec_configuration();
+
+    //关闭上下文
+    return env->NewStringUTF(hello.c_str());
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_nick_play_MainActivity_open(JNIEnv *env, jobject instance, jstring url_, jobject handle) {
+    const char *url = env->GetStringUTFChars(url_, 0);
+    bool flag = false;
+    FILE *fp = fopen(url, "rb");
+    if (!fp) {
+        LOGW("%s 打开失敗", url);
+
+    } else {
+        flag = true;
+        LOGW("%s 打开成功 ", url);
+        fclose(fp);
+    }
+
+    env->ReleaseStringUTFChars(url_, url);
+    return flag;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_nick_play_XPlay_Open(JNIEnv *env, jobject instance, jstring url_, jobject surface) {
+    const char *path = env->GetStringUTFChars(url_, 0);
     //初始化解封裝
     av_register_all();
     //初始化網絡
@@ -60,12 +90,12 @@ Java_com_nick_play_MainActivity_stringFromJNI(
 
     //打开文件
     AVFormatContext *ic = NULL;
-    char path[] = "/sdcard/1280x720_1.mp4";
+    //char path[] = "/sdcard/1280x720_1.mp4";
 //    char path[] = "/sdcard/1280x720_1.flv";
     int re = avformat_open_input(&ic, path, 0, 0);
     if (re != 0) {
         LOGW("avformat_open_input failed!:%s", av_err2str(re));
-        return env->NewStringUTF(hello.c_str());
+        return;
     }
 
     LOGW("avformat_open_input %s success!", path);
@@ -127,7 +157,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
 
     if (!vcodec) {
         LOGW("avcodec_find video failed!");
-        return env->NewStringUTF("");
+        return;
     }
 
     //视频 解码器初始化
@@ -139,7 +169,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     re = avcodec_open2(vc, 0, 0);
     if (re != 0) {
         LOGW("avcodec_open2 video failed!");
-        return env->NewStringUTF("");
+        return;
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////
     //打开音频解码器
@@ -148,7 +178,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
 
     if (!acodec) {
         LOGW("avcodec_find audio failed!");
-        return env->NewStringUTF("");
+        return;
     }
 
     //音频 解码器初始化
@@ -160,7 +190,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     re = avcodec_open2(ac, 0, 0);
     if (re != 0) {
         LOGW("avcodec_open2 audio failed!");
-        return env->NewStringUTF("");
+        return;
     }
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -202,6 +232,13 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     } else {
         LOGW("swr_init success!");
     }
+
+    //显示窗口的初始化
+    ANativeWindow *nwin = ANativeWindow_fromSurface(env, surface);
+    //设置窗口的格式
+    ANativeWindow_setBuffersGeometry(nwin, outWidth, outHeight, WINDOW_FORMAT_RGBA_8888);
+    //设置后备缓冲
+    ANativeWindow_Buffer wbuf;
 
 
     for (;;) {
@@ -281,6 +318,12 @@ Java_com_nick_play_MainActivity_stringFromJNI(
                                       frame->height,
                                       data, lines);
                     LOGW("sws_scale = %d!", h);
+                    if (h > 0) {
+                        ANativeWindow_lock(nwin, &wbuf, 0);
+                        uint8_t *dst = (uint8_t *) wbuf.bits;
+                        memcpy(dst, rgb, outWidth * outHeight * 4);
+                        ANativeWindow_unlockAndPost(nwin);
+                    }
 
                 }
 
@@ -303,24 +346,7 @@ Java_com_nick_play_MainActivity_stringFromJNI(
     delete pcm;
     //关闭上下文
     avformat_close_input(&ic);
-    return env->NewStringUTF(hello.c_str());
-}
 
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_com_nick_play_MainActivity_open(JNIEnv *env, jobject instance, jstring url_, jobject handle) {
-    const char *url = env->GetStringUTFChars(url_, 0);
-    bool flag = false;
-    FILE *fp = fopen(url, "rb");
-    if (!fp) {
-        LOGW("%s 打开失敗", url);
+    env->ReleaseStringUTFChars(url_, path);
 
-    } else {
-        flag = true;
-        LOGW("%s 打开成功 ", url);
-        fclose(fp);
-    }
-
-    env->ReleaseStringUTFChars(url_, url);
-    return flag;
 }
